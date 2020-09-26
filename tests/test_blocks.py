@@ -217,7 +217,8 @@ class TestComparisons:
         X, Y, T = np.meshgrid(x, x, t)
         Z = np.sin(X**2+Y**2-T)
 
-        block = amp.blocks.Pcolormesh(X[:, :, 0], Y[:, :, 0], Z, t_axis=2)
+        with pytest.warns(DeprecationWarning):
+            block = amp.blocks.Pcolormesh(X[:, :, 0], Y[:, :, 0], Z, t_axis=2)
         return amp.Animation([block])
 
     @animation_compare(baseline_images='Blocks/Pcolormesh_corner', nframes=3)

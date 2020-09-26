@@ -53,17 +53,32 @@ class Pcolormesh(Block):
         # replicate matplotlib logic for setting default shading value because
         # matplotlib resets the _shading member variable of the QuadMesh to "flat" after
         # interpolating X and Y to corner positions
-        self. shading = kwargs.get("shading", plt.rcParams.get("pcolor.shading", "flat"))
+        shading = kwargs.get("shading", plt.rcParams.get("pcolor.shading", "flat"))
         Nx = self.X.shape[-1]
         Ny = self.Y.shape[0]
-        if self.shading == "auto":
+        if shading == "auto":
             if (Ny, Nx) == self.C[Slice].shape:
-                self.shading = "nearest"
+                shading = "nearest"
             else:
-                self.shading = "flat"
-        if self.shading == "flat" and ((Ny - 1, Nx - 1) == self.C[Slice].shape):
-            # Need to slice without the workaround in _update()
-            self.shading = "flat_corner_grid"
+                shading = "flat"
+        if shading == "flat" and ((Ny, Nx) == self.C[Slice].shape):
+            # slice C to (Ny - 1)*(Nx - 1) so we can use standard Block._make_slice() in
+            # _update()
+            import warnings
+
+            warnings.warn(
+                "shading='flat' when X and Y have the same dimensions as C is "
+                "deprecated since matplotlib-3.3.  Either specify the corners of the "
+                "quadrilaterals with X and Y, or pass shading='auto', 'nearest' or "
+                "'gouraud', or set rcParams['pcolor.shading']. This will be an error "
+                "when matplotlib reaches version 3.5 and this animatplot work-around "
+                "will be removed then.",
+                DeprecationWarning
+            )
+
+            flat_slice = [slice(-1)]*3
+            flat_slice[self.t_axis] = slice(None)
+            self.C = self.C[flat_slice]
 
         if self._arg_len == 1:
             self.quad = self.ax.pcolormesh(self.C[Slice], **kwargs)
@@ -71,25 +86,14 @@ class Pcolormesh(Block):
             self.quad = self.ax.pcolormesh(self.X, self.Y, self.C[Slice], **kwargs)
 
     def _update(self, i):
-        if self.shading == "flat":
-            Slice = self._make_pcolormesh_flat_slice(i, 3)
-            self.quad.set_array(self.C[Slice].ravel())
-        else:
-            Slice = self._make_slice(i, 3)
-            self.quad.set_array(self.C[Slice])
+        Slice = self._make_slice(i, 3)
+        self.quad.set_array(self.C[Slice])
         return self.quad
 
     def __len__(self):
         if self._is_list:
             return self.C.shape[0]
         return self.C.shape[self.t_axis]
-
-    def _make_pcolormesh_flat_slice(self, i, dim):
-        if self._is_list:
-            return i
-        Slice = [slice(-1)]*3  # weird thing to make animation work
-        Slice[self.t_axis] = i
-        return tuple(Slice)
 
 
 class Imshow(Block):
